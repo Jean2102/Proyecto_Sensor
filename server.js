@@ -1,28 +1,32 @@
-const express = require('express');
-const mongoose = require('mongoose');
-const cors = require('cors');
+const express = require("express");
+const mongoose = require("mongoose");
+const cors = require("cors");
 const app = express();
 
+// Middlewares
 app.use(cors());
-mongoose.connect(process.env.MONGODB_URI);
+app.use(express.json());
 
-const TempSchema = new mongoose.Schema({
-  value: Number,
-  timestamp: { type: Date, default: Date.now }
-});
-const Temp = mongoose.model('Temp', TempSchema);
+// Conexión a MongoDB
+mongoose.connect("mongodb+srv://moralesjean543:J3anmarc0@cluster0.ka9udsb.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0");
 
-app.post('/api/data', async (req, res) => {
-  const { value } = req.body;
-  const newTemp = new Temp({ value });
-  await newTemp.save();
-  res.send('Datos guardados');
+// Ruta raíz (¡obligatoria!)
+app.get("/", (req, res) => {
+  res.send("✅ Servidor activo. Usa /api/data para acceder a los datos.");
 });
 
-app.get('/api/data', async (req, res) => {
-  const data = await Temp.find().sort({ timestamp: -1 }).limit(50);
-  res.json(data);
+// Ruta POST para recibir datos del ESP32
+app.post("/api/data", async (req, res) => {
+  // ... código para guardar datos ...
 });
 
+// Ruta GET para obtener datos
+app.get("/api/data", async (req, res) => {
+  // ... código para leer datos ...
+});
+
+// Iniciar servidor
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Servidor en puerto ${PORT}`));
+app.listen(PORT, () => {
+  console.log(`🖥️ Servidor en http://localhost:${PORT}`);
+});
