@@ -24,3 +24,8 @@ app.post("/api/data", async (req, res) => {
 app.get("/api/data", async (req, res) => {
   // ... código para leer datos ...
 });
+const PORT = process.env.PORT || 3000; // Usar process.env.PORT
+
+app.listen(PORT, () => {
+  console.log(`🖥️ Servidor en puerto ${PORT}`);
+});
