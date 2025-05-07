@@ -32,7 +32,7 @@ const transporter = nodemailer.createTransport({
 function enviarAlerta(valor) {
   const mailOptions = {
     from: "moralesjean543@gmail.com",
-    to: "moralesjean543@gmail.com",
+    to: "marcos1982morales@gmail.com",
     subject: "🚨 Alerta de Temperatura Alta",
     text: `Se ha registrado una temperatura elevada: ${valor} °C`
   };
@@ -56,7 +56,7 @@ app.post("/api/data", async (req, res) => {
     const newData = new Data({ valor });
     await newData.save();
 
-    const UMBRAL = 30;
+    const UMBRAL = 24;
     if (valor > UMBRAL) {
       console.log(`🚨 ALERTA: Temperatura alta registrada: ${valor} °C`);
       enviarAlerta(valor);
