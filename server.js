@@ -1,9 +1,10 @@
+
 const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
-const app = express();
+const nodemailer = require("nodemailer");
 
-// Middleware
+const app = express();
 app.use(cors());
 app.use(express.json());
 
@@ -12,25 +13,55 @@ mongoose.connect("mongodb+srv://moralesjean543:J3anmarc0@cluster0.ka9udsb.mongod
   .then(() => console.log("✅ Conectado a MongoDB"))
   .catch(err => console.error("❌ Error de conexión:", err));
 
-// Definir esquema y modelo
+// Esquema y modelo
 const dataSchema = new mongoose.Schema({
-  valor: Number,       // ajusta según los datos que envías
+  valor: Number,
   timestamp: { type: Date, default: Date.now }
 });
-
 const Data = mongoose.model("Data", dataSchema);
 
-// Ruta raíz
+// ✉️ Configura nodemailer (correo de alerta)
+const transporter = nodemailer.createTransport({
+  service: "gmail",
+  auth: {
+    user: "moralesjean543@gmail.com",
+    pass: "agsi ttva bkkn pbkz"
+  }
+});
+
+function enviarAlerta(valor) {
+  const mailOptions = {
+    from: "moralesjean543@gmail.com",
+    to: "moralesjean543@gmail.com",
+    subject: "🚨 Alerta de Temperatura Alta",
+    text: `Se ha registrado una temperatura elevada: ${valor} °C`
+  };
+
+  transporter.sendMail(mailOptions, (error, info) => {
+    if (error) {
+      console.error("❌ Error al enviar correo:", error);
+    } else {
+      console.log("📧 Alerta enviada:", info.response);
+    }
+  });
+}
+
 app.get("/", (req, res) => {
   res.send("✅ Servidor activo. Usa /api/data para acceder a los datos.");
 });
 
-// POST para recibir y guardar datos del ESP32
 app.post("/api/data", async (req, res) => {
   try {
-    const { valor } = req.body; // Asegúrate que el ESP32 envíe este campo
+    const { valor } = req.body;
     const newData = new Data({ valor });
     await newData.save();
+
+    const UMBRAL = 30;
+    if (valor > UMBRAL) {
+      console.log(`🚨 ALERTA: Temperatura alta registrada: ${valor} °C`);
+      enviarAlerta(valor);
+    }
+
     res.status(201).json({ message: "✅ Datos guardados correctamente" });
   } catch (error) {
     console.error("❌ Error al guardar:", error);
@@ -38,10 +69,9 @@ app.post("/api/data", async (req, res) => {
   }
 });
 
-// GET para obtener todos los datos guardados
 app.get("/api/data", async (req, res) => {
   try {
-    const datos = await Data.find().sort({ timestamp: -1 }); // orden descendente
+    const datos = await Data.find().sort({ timestamp: -1 });
     res.json(datos);
   } catch (error) {
     console.error("❌ Error al obtener datos:", error);

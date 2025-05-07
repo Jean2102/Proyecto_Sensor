@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Temperaturas ESP32</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+      background-color: #f4f4f4;
+    }
+    h1 {
+      color: #333;
+    }
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      margin-top: 20px;
+    }
+    th, td {
+      border: 1px solid #ccc;
+      padding: 10px;
+      text-align: center;
+    }
+    th {
+      background-color: #007BFF;
+      color: white;
+    }
+    tr:nth-child(even) {
+      background-color: #f9f9f9;
+    }
+    .refresh {
+      margin-top: 10px;
+      padding: 10px 20px;
+      background-color: #28A745;
+      color: white;
+      border: none;
+      cursor: pointer;
+    }
+    .refresh:hover {
+      background-color: #218838;
+    }
+  </style>
+</head>
+<body>
+  <h1>Registros de Temperatura</h1>
+  <button class="refresh" onclick="cargarDatos()">🔄 Actualizar</button>
+  <table id="tabla">
+    <thead>
+      <tr>
+        <th>Temperatura (°C)</th>
+        <th>Fecha y Hora</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+  <script>
+    async function cargarDatos() {
+      const tablaBody = document.querySelector("#tabla tbody");
+      tablaBody.innerHTML = "<tr><td colspan='2'>Cargando...</td></tr>";
+      try {
+        const res = await fetch("https://controlador-x8c7.onrender.com/api/data");
+        const datos = await res.json();
+        tablaBody.innerHTML = "";
+        datos.forEach(item => {
+          const fila = document.createElement("tr");
+          const temp = item.valor.toFixed(2);
+          const fecha = new Date(item.timestamp).toLocaleString();
+          fila.innerHTML = `<td>${temp}</td><td>${fecha}</td>`;
+          tablaBody.appendChild(fila);
+        });
+      } catch (error) {
+        tablaBody.innerHTML = `<tr><td colspan="2">Error al cargar datos</td></tr>`;
+        console.error("Error:", error);
+      }
+    }
+
+    // Cargar al iniciar
+    cargarDatos();
+  </script>
+</body>
+</html>
