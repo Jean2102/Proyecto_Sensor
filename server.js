@@ -24,15 +24,15 @@ const Data = mongoose.model("Data", dataSchema);
 const transporter = nodemailer.createTransport({
   service: "gmail",
   auth: {
-    user: "moralesjean543@gmail.com",
-    pass: "agsi ttva bkkn pbkz"
+    user: "stccontrolador@gmail.com",
+    pass: "voxh rjga uuyd lzsd"
   }
 });
 
 function enviarAlerta(valor) {
   const mailOptions = {
-    from: "moralesjean543@gmail.com",
-    to: "marcos1982morales@gmail.com",
+    from: "stccontrolador@gmail.com",
+    to: "moralesjean543@gmail.com",
     subject: "🚨 Alerta de Temperatura Alta",
     text: `Se ha registrado una temperatura elevada: ${valor} °C`
   };
