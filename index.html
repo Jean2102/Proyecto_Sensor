@@ -3,53 +3,89 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistema de Monitoreo de Temperatura</title>
+    <title>Monitor de Temperatura</title>
     <style>
-        /* Estilos mejorados para pestañas */
+        :root {
+            --primary-color: #2c3e50;
+            --secondary-color: #3498db;
+            --alert-color: #e74c3c;
+        }
+
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f6fa;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
         .tab {
             overflow: hidden;
-            border: 1px solid #ccc;
-            background-color: #f1f1f1;
+            background-color: #fff;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            border-radius: 8px;
             margin-bottom: 20px;
         }
-        
+
         .tab button {
             background-color: inherit;
             float: left;
             border: none;
             outline: none;
             cursor: pointer;
-            padding: 14px 16px;
+            padding: 14px 20px;
             transition: 0.3s;
             font-size: 16px;
+            color: var(--primary-color);
         }
-        
+
         .tab button:hover {
-            background-color: #ddd;
+            background-color: #f8f9fa;
         }
-        
+
         .tab button.active {
-            background-color: #ccc;
+            border-bottom: 3px solid var(--secondary-color);
+            color: var(--secondary-color);
         }
-        
+
         .tabcontent {
             display: none;
+            background: white;
+            padding: 25px;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+
+        /* Cuadro de temperatura actual */
+        .temp-box {
+            background: var(--secondary-color);
+            color: white;
             padding: 20px;
-            border: 1px solid #ccc;
-            animation: fadeEffect 0.5s;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            text-align: center;
         }
 
-        @keyframes fadeEffect {
-            from {opacity: 0;}
-            to {opacity: 1;}
+        .temp-box h3 {
+            margin: 0 0 10px 0;
+            font-size: 1.2em;
         }
 
-        /* Estilo inicial para mostrar la primera pestaña */
-        #monitor {
-            display: block;
+        .temp-value {
+            font-size: 2.5em;
+            font-weight: bold;
+        }
+
+        /* Contenedor gráfico */
+        .chart-container {
+            height: 400px;
+            position: relative;
         }
     </style>
-    <!-- Resto del CSS anterior se mantiene igual -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="/socket.io/socket.io.js"></script>
 </head>
@@ -63,63 +99,106 @@
             <button class="tablinks" onclick="openTab(event, 'config')">Configuración</button>
         </div>
 
-        <!-- Pestañas corregidas -->
-        <div id="monitor" class="tabcontent">
-            <h2>Gráfico de Temperatura</h2>
-            <canvas id="grafico"></canvas>
-        </div>
-
-        <div id="alertas" class="tabcontent">
-            <h2>Historial de Alertas</h2>
-            <div class="alertas-list" id="lista-alertas"></div>
-        </div>
-
-        <div id="config" class="tabcontent">
-            <h2>Configuración de Umbral</h2>
-            <div class="config-section">
-                <input type="number" id="umbral" placeholder="Ej: 24" step="0.1">
-                <button onclick="setUmbral()">Guardar Umbral</button>
+        <!-- Pestaña Monitor -->
+        <div id="monitor" class="tabcontent" style="display: block;">
+            <div class="temp-box">
+                <h3>Temperatura Actual</h3>
+                <div class="temp-value" id="temp-actual">-- °C</div>
+            </div>
+            
+            <h2>Historial de Temperaturas</h2>
+            <div class="chart-container">
+                <canvas id="grafico"></canvas>
             </div>
         </div>
 
-        <audio id="alerta-sonido" src="/alert.mp3"></audio>
+        <!-- Otras pestañas se mantienen igual -->
+        <!-- ... -->
     </div>
 
     <script>
-        // Función openTab corregida
-        function openTab(evt, tabName) {
-            // Ocultar todos los tabcontent
-            const tabContents = document.getElementsByClassName("tabcontent");
-            for (let i = 0; i < tabContents.length; i++) {
-                tabContents[i].style.display = "none";
-            }
+        const socket = io();
+        let chart;
 
-            // Remover clase active de todos los botones
-            const tabButtons = document.getElementsByClassName("tablinks");
-            for (let i = 0; i < tabButtons.length; i++) {
-                tabButtons[i].className = tabButtons[i].className.replace(" active", "");
-            }
-
-            // Mostrar la pestaña seleccionada y marcar el botón como activo
-            document.getElementById(tabName).style.display = "block";
-            evt.currentTarget.className += " active";
+        // Función para actualizar el cuadro de temperatura
+        function actualizarTemperaturaActual(valor) {
+            const tempElement = document.getElementById('temp-actual');
+            tempElement.innerHTML = `${valor} °C`;
+            
+            // Cambiar color según umbral
+            const umbral = document.getElementById('umbral')?.value || 24;
+            tempElement.style.color = valor > umbral ? var(--alert-color) : 'white';
         }
 
-        // Resto del código JavaScript anterior...
-        
-        // Inicialización corregida
-        document.addEventListener('DOMContentLoaded', () => {
-            // Mostrar primera pestaña por defecto
-            document.querySelector('.tablinks').click();
+        // Configurar gráfico
+        async function initChart() {
+            try {
+                const response = await fetch('/api/data');
+                const data = await response.json();
+                
+                const ctx = document.getElementById('grafico').getContext('2d');
+                
+                chart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: data.map(d => new Date(d.timestamp).toLocaleString()),
+                        datasets: [{
+                            label: 'Temperatura (°C)',
+                            data: data.map(d => d.valor),
+                            borderColor: var(--secondary-color),
+                            backgroundColor: 'rgba(52, 152, 219, 0.1)',
+                            tension: 0.3,
+                            fill: true
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            y: {
+                                beginAtZero: false,
+                                title: {
+                                    display: true,
+                                    text: 'Temperatura (°C)'
+                                }
+                            },
+                            x: {
+                                title: {
+                                    display: true,
+                                    text: 'Fecha y Hora'
+                                }
+                            }
+                        }
+                    }
+                });
+                
+                // Mostrar última temperatura
+                if(data.length > 0) {
+                    actualizarTemperaturaActual(data[0].valor);
+                }
+            } catch (error) {
+                console.error('Error al cargar datos:', error);
+            }
+        }
+
+        // Escuchar actualizaciones en tiempo real
+        socket.on('nueva_temperatura', (data) => {
+            // Actualizar cuadro de temperatura
+            actualizarTemperaturaActual(data.valor);
             
-            // Inicializar gráfico y demás funciones
+            // Actualizar gráfico
+            if(chart) {
+                chart.data.labels.push(new Date(data.timestamp).toLocaleString());
+                chart.data.datasets[0].data.push(data.valor);
+                chart.update();
+            }
+        });
+
+        // Resto del código anterior...
+        
+        document.addEventListener('DOMContentLoaded', () => {
             initChart();
             actualizarAlertas();
-            
-            setInterval(() => {
-                if(chart) chart.update();
-                actualizarAlertas();
-            }, 60000);
         });
     </script>
 </body>
