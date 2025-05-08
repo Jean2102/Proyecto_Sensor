@@ -1,335 +1,284 @@
-<!DOCTYPE html>
-<html>
+      <!DOCTYPE html>
+<html lang="es">
 <head>
-    <title>Monitor de Temperatura</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Monitoreo de Temperatura</title>
     <style>
-        body {
-            font-family: 'Arial', sans-serif;
-            max-width: 1000px;
-            margin: 0 auto;
-            padding: 20px;
-            background-color: #f5f5f5;
+        :root {
+            --primary-color: #2c3e50;
+            --secondary-color: #3498db;
+            --alert-color: #e74c3c;
         }
-        
-        .card {
-            background: white;
-            border-radius: 10px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            margin: 0;
             padding: 20px;
+            background-color: #f5f6fa;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .tab {
+            overflow: hidden;
+            background-color: #fff;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            border-radius: 8px;
             margin-bottom: 20px;
         }
-        
-        .data-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 15px;
+
+        .tab button {
+            background-color: inherit;
+            float: left;
+            border: none;
+            outline: none;
+            cursor: pointer;
+            padding: 14px 20px;
+            transition: 0.3s;
+            font-size: 16px;
+            color: var(--primary-color);
         }
-        
-        .data-table th, .data-table td {
+
+        .tab button:hover {
+            background-color: #f8f9fa;
+        }
+
+        .tab button.active {
+            border-bottom: 3px solid var(--secondary-color);
+            color: var(--secondary-color);
+        }
+
+        .tabcontent {
+            display: none;
+            background: white;
+            padding: 25px;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+
+        .config-section {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 25px;
+        }
+
+        input[type="number"] {
+            padding: 10px;
             border: 1px solid #ddd;
-            padding: 12px;
-            text-align: left;
+            border-radius: 5px;
+            width: 200px;
         }
-        
-        .data-table th {
-            background-color: #f2f2f2;
-        }
-        
-        .data-table tr:nth-child(even) {
-            background-color: #f9f9f9;
-        }
-        
-        .btn {
-            background-color: #ff4444;
+
+        button {
+            padding: 10px 20px;
+            background-color: var(--secondary-color);
             color: white;
             border: none;
-            padding: 8px 12px;
-            border-radius: 4px;
+            border-radius: 5px;
             cursor: pointer;
             transition: background-color 0.3s;
         }
-        
-        .btn:hover {
-            background-color: #cc0000;
+
+        button:hover {
+            background-color: #2980b9;
         }
-        
-        .refresh-info {
-            margin-top: 20px;
-            font-style: italic;
-            color: #666;
+
+        #grafico {
+            margin: 20px 0;
+            max-height: 500px;
         }
-        
-        .chart-container {
-            height: 400px;
+
+        .alertas-list {
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            padding: 15px;
         }
-        
-        .alert-badge {
-            display: inline-block;
-            background-color: #ff4444;
-            color: white;
-            padding: 3px 8px;
-            border-radius: 10px;
-            font-size: 0.8em;
-            margin-left: 10px;
+
+        .alerta-item {
+            padding: 12px;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .alerta-item:last-child {
+            border-bottom: none;
+        }
+
+        .alerta-valor {
+            color: var(--alert-color);
+            font-weight: bold;
         }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="/socket.io/socket.io.js"></script>
 </head>
 <body>
-    <h1>Monitor de Temperatura en Tiempo Real</h1>
-    
-    <div class="card">
-        <h2>Gráfico de Temperatura</h2>
-        <div class="chart-container">
+    <div class="container">
+        <h1>Monitor de Temperatura en Tiem Real</h1>
+        
+        <div class="tab">
+            <button class="tablinks active" onclick="openTab(event, 'monitor')">Monitor</button>
+            <button class="tablinks" onclick="openTab(event, 'alertas')">Alertas</button>
+            <button class="tablinks" onclick="openTab(event, 'config')">Configuración</button>
+        </div>
+
+        <!-- Pestaña Monitor -->
+        <div id="monitor" class="tabcontent" style="display: block;">
+            <h2>Gráfico de Temperatura</h2>
             <canvas id="grafico"></canvas>
         </div>
-    </div>
-    
-    <div class="card">
-        <h2>Historial de Alertas <span id="alert-count" class="alert-badge">0</span></h2>
-        <div id="lista-alertas"></div>
-    </div>
-    
-    <div class="card">
-        <h2>Historial de Datos</h2>
-        <div style="overflow-x: auto;">
-            <table class="data-table">
-                <thead>
-                    <tr>
-                        <th>Fecha/Hora</th>
-                        <th>Temperatura (°C)</th>
-                        <th>Acciones</th>
-                    </tr>
-                </thead>
-                <tbody id="tabla-datos">
-                    <!-- Datos se cargarán aquí -->
-                </tbody>
-            </table>
-        </div>
-        <div class="refresh-info">
-            Última actualización: <span id="last-update">--</span>
-            (Actualización automática cada 5 segundos)
-        </div>
-    </div>
 
-    <audio id="alerta-sonido" src="/alert.mp3" preload="auto"></audio>
+        <!-- Pestaña Alertas -->
+        <div id="alertas" class="tabcontent">
+            <h2>Historial de Alertas</h2>
+            <div class="alertas-list" id="lista-alertas"></div>
+        </div>
+
+        <!-- Pestaña Configuración -->
+        <div id="config" class="tabcontent">
+            <h2>Configuración de Umbral</h2>
+            <div class="config-section">
+                <input type="number" id="umbral" placeholder="Ej: 24" step="0.1">
+                <button onclick="setUmbral()">Guardar Umbral</button>
+            </div>
+        </div>
+
+        <audio id="alerta-sonido" src="/alert.mp3"></audio>
+    </div>
 
     <script>
-        // Configuración fija del umbral (se modifica solo en código)
-        const TEMPERATURE_THRESHOLD = 30.0; // <- Umbral definido aquí
-        
-        // Variables globales
-        let chart;
-        let allData = [];
-        let visibleData = [];
         const socket = io();
-        const itemsPerPage = 10;
-        
-        // Inicialización al cargar la página
-        document.addEventListener('DOMContentLoaded', () => {
-            initChart();
-            loadData();
-            setInterval(loadData, 5000); // Actualizar cada 5 segundos
-            
-            // Mostrar umbral actual (solo informativo)
-            console.log(`Umbral configurado: ${TEMPERATURE_THRESHOLD}°C`);
-        });
-        
-        // Configurar gráfico
-        async function initChart() {
-            const ctx = document.getElementById('grafico').getContext('2d');
-            chart = new Chart(ctx, {
-                type: 'line',
-                data: {
-                    datasets: [{
-                        label: 'Temperatura (°C)',
-                        borderColor: '#36A2EB',
-                        backgroundColor: 'rgba(54, 162, 235, 0.1)',
-                        tension: 0.1,
-                        fill: true
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    scales: {
-                        x: {
-                            type: 'time',
-                            time: {
-                                tooltipFormat: 'DD/MM/YY HH:mm:ss'
-                            }
-                        },
-                        y: {
-                            title: {
-                                display: true,
-                                text: 'Temperatura (°C)'
-                            }
-                        }
-                    },
-                    plugins: {
-                        annotation: {
-                            annotations: {
-                                thresholdLine: {
-                                    type: 'line',
-                                    yMin: TEMPERATURE_THRESHOLD,
-                                    yMax: TEMPERATURE_THRESHOLD,
-                                    borderColor: 'red',
-                                    borderWidth: 2,
-                                    borderDash: [6, 6],
-                                    label: {
-                                        content: `Umbral: ${TEMPERATURE_THRESHOLD}°C`,
-                                        enabled: true,
-                                        position: 'left'
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
+        let chart;
+
+        // Función para cambiar pestañas
+        function openTab(evt, tabName) {
+            document.querySelectorAll('.tabcontent').forEach(tab => {
+                tab.style.display = 'none';
             });
+            
+            document.querySelectorAll('.tablinks').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            
+            document.getElementById(tabName).style.display = 'block';
+            evt.currentTarget.classList.add('active');
         }
-        
-        // Cargar datos del servidor
-        async function loadData() {
+
+        // Inicializar gráfico
+        async function initChart() {
             try {
                 const response = await fetch('/api/data');
                 const data = await response.json();
-                allData = data;
-                updateVisibleData();
-                updateChart();
-                updateLastUpdateTime();
+                
+                const ctx = document.getElementById('grafico').getContext('2d');
+                
+                chart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: data.map(d => new Date(d.timestamp).toLocaleString()),
+                        datasets: [{
+                            label: 'Temperatura (°C)',
+                            data: data.map(d => d.valor),
+                            borderColor: var(--secondary-color),
+                            tension: 0.3,
+                            fill: false
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        scales: {
+                            y: {
+                                beginAtZero: false
+                            }
+                        }
+                    }
+                });
             } catch (error) {
-                console.error('Error cargando datos:', error);
+                console.error('Error al cargar datos:', error);
             }
-            
-            await actualizarAlertas();
         }
-        
-        // Actualizar datos visibles
-        function updateVisibleData() {
-            visibleData = allData.slice(-itemsPerPage);
-            renderTable();
-        }
-        
-        // Renderizar tabla de datos
-        function renderTable() {
-            const tableBody = document.getElementById('tabla-datos');
-            tableBody.innerHTML = '';
-            
-            visibleData.forEach(item => {
-                const row = document.createElement('tr');
-                
-                // Resaltar valores sobre el umbral
-                const isAlert = item.valor > TEMPERATURE_THRESHOLD;
-                const rowStyle = isAlert ? 'background-color: #fff0f0;' : '';
-                
-                row.innerHTML = `
-                    <td>${new Date(item.timestamp).toLocaleString()}</td>
-                    <td style="${rowStyle}">${item.valor.toFixed(2)}</td>
-                    <td>
-                        <button class="btn" onclick="hideDataItem('${item._id}')">
-                            Ocultar
-                        </button>
-                    </td>
-                `;
-                
-                tableBody.appendChild(row);
-            });
-        }
-        
-        // Ocultar dato (solo en frontend)
-        function hideDataItem(id) {
-            allData = allData.filter(item => item._id !== id);
-            updateVisibleData();
-            updateChart();
-        }
-        
-        // Actualizar gráfico
-        function updateChart() {
-            const sortedData = [...allData].sort((a, b) => 
-                new Date(a.timestamp) - new Date(b.timestamp)
-            );
-            
-            chart.data.labels = sortedData.map(item => new Date(item.timestamp));
-            chart.data.datasets[0].data = sortedData.map(item => ({
-                x: new Date(item.timestamp),
-                y: item.valor
-            }));
-            
-            chart.update();
-        }
-        
-        // Actualizar alertas
+
+        // Actualizar lista de alertas
         async function actualizarAlertas() {
             try {
                 const response = await fetch('/api/alertas');
                 const alertas = await response.json();
                 
-                const lista = alertas.map(a => `
-                    <div style="padding: 10px; border-bottom: 1px solid #eee;">
-                        ${new Date(a.timestamp).toLocaleString()} - 
-                        <b>${a.valor.toFixed(2)}°C</b> (Umbral: ${a.threshold}°C)
+                const lista = alertas.map(alerta => `
+                    <div class="alerta-item">
+                        <div>
+                            <span>${new Date(alerta.timestamp).toLocaleString()}</span>
+                        </div>
+                        <div>
+                            <span class="alerta-valor">${alerta.valor}°C</span>
+                            (Umbral: ${alerta.threshold}°C)
+                        </div>
                     </div>
                 `).join('');
                 
-                document.getElementById('lista-alertas').innerHTML = lista || "No hay alertas recientes";
-                document.getElementById('alert-count').textContent = alertas.length;
+                document.getElementById('lista-alertas').innerHTML = lista;
             } catch (error) {
-                console.error('Error cargando alertas:', error);
+                console.error('Error al cargar alertas:', error);
             }
         }
-        
-        // Actualizar marca de tiempo
-        function updateLastUpdateTime() {
-            document.getElementById('last-update').textContent = 
-                new Date().toLocaleTimeString();
+
+        // Configurar nuevo umbral
+        async function setUmbral() {
+            const input = document.getElementById('umbral');
+            const umbral = parseFloat(input.value);
+            
+            if (isNaN(umbral)) {
+                alert('Ingrese un valor numérico válido');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/umbral', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ umbral })
+                });
+                
+                const result = await response.json();
+                alert(result.message);
+            } catch (error) {
+                console.error('Error al actualizar umbral:', error);
+                alert('Error al actualizar el umbral');
+            }
         }
-        
+
         // Escuchar alertas en tiempo real
         socket.on('alerta', (data) => {
             document.getElementById('alerta-sonido').play();
             
-            const toast = document.createElement('div');
-            toast.style = `
-                position: fixed;
-                top: 20px;
-                right: 20px;
-                background-color: #ff4444;
-                color: white;
-                padding: 15px;
-                border-radius: 5px;
-                box-shadow: 0 4px 8px rgba(0,0,0,0.2);
-                z-index: 1000;
-                animation: fadeIn 0.5s;
-            `;
-            toast.innerHTML = `
-                <strong>¡ALERTA!</strong><br>
-                Temperatura: ${data.valor.toFixed(2)}°C<br>
-                Umbral: ${data.threshold}°C
-            `;
+            const alertMessage = `¡ALERTA! Temperatura actual: ${data.valor}°C\n` +
+                               `Umbral configurado: ${data.umbral}°C\n` +
+                               `Hora: ${new Date(data.timestamp).toLocaleTimeString()}`;
             
-            document.body.appendChild(toast);
-            
-            setTimeout(() => {
-                toast.style.animation = 'fadeOut 0.5s';
-                setTimeout(() => toast.remove(), 500);
-            }, 5000);
-            
+            alert(alertMessage);
             actualizarAlertas();
         });
-    </script>
 
-    <style>
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(20px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        
-        @keyframes fadeOut {
-            from { opacity: 1; transform: translateY(0); }
-            to { opacity: 0; transform: translateY(20px); }
-        }
-    </style>
+        // Inicialización
+        document.addEventListener('DOMContentLoaded', () => {
+            initChart();
+            actualizarAlertas();
+            
+            // Actualizar datos cada 1 minuto
+            setInterval(() => {
+                chart.update();
+                actualizarAlertas();
+            }, 60000);
+        });
+    </script>
 </body>
 </html>
