@@ -5,85 +5,34 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Monitor de Temperatura</title>
     <style>
-        :root {
-            --primary-color: #2c3e50;
-            --secondary-color: #3498db;
-            --alert-color: #e74c3c;
-        }
-
-        body {
-            font-family: 'Segoe UI', sans-serif;
-            margin: 0;
-            padding: 20px;
-            background-color: #f5f6fa;
-        }
-
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-        }
-
-        .tab {
-            overflow: hidden;
-            background-color: #fff;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-            border-radius: 8px;
-            margin-bottom: 20px;
-        }
-
-        .tab button {
-            background-color: inherit;
-            float: left;
-            border: none;
-            outline: none;
-            cursor: pointer;
-            padding: 14px 20px;
-            transition: 0.3s;
-            font-size: 16px;
-            color: var(--primary-color);
-        }
-
-        .tab button:hover {
-            background-color: #f8f9fa;
-        }
-
-        .tab button.active {
-            border-bottom: 3px solid var(--secondary-color);
-            color: var(--secondary-color);
-        }
-
+        /* Estilos mejorados */
         .tabcontent {
             display: none;
-            background: white;
-            padding: 25px;
-            border-radius: 8px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            padding: 20px;
+            animation: fadeIn 0.5s;
         }
-
-        /* Cuadro de temperatura actual */
-        .temp-box {
-            background: var(--secondary-color);
+        
+        .tabcontent.active {
+            display: block;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        
+        .temp-actual {
+            background: #3498db;
             color: white;
             padding: 20px;
             border-radius: 10px;
-            margin-bottom: 20px;
+            margin: 20px 0;
             text-align: center;
+            font-size: 24px;
         }
-
-        .temp-box h3 {
-            margin: 0 0 10px 0;
-            font-size: 1.2em;
-        }
-
-        .temp-value {
-            font-size: 2.5em;
-            font-weight: bold;
-        }
-
-        /* Contenedor gráfico */
-        .chart-container {
-            height: 400px;
-            position: relative;
+        
+        #grafico {
+            max-height: 500px;
         }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -91,46 +40,56 @@
 </head>
 <body>
     <div class="container">
-        <h1>Monitor de Temperatura en Tiempo Real</h1>
-        
         <div class="tab">
-            <button class="tablinks active" onclick="openTab(event, 'monitor')">Monitor</button>
+            <button class="tablinks" onclick="openTab(event, 'monitor')" id="defaultTab">Monitor</button>
             <button class="tablinks" onclick="openTab(event, 'alertas')">Alertas</button>
             <button class="tablinks" onclick="openTab(event, 'config')">Configuración</button>
         </div>
 
         <!-- Pestaña Monitor -->
-        <div id="monitor" class="tabcontent" style="display: block;">
-            <div class="temp-box">
-                <h3>Temperatura Actual</h3>
-                <div class="temp-value" id="temp-actual">-- °C</div>
+        <div id="monitor" class="tabcontent">
+            <div class="temp-actual" id="tempActual">
+                Cargando...
             </div>
-            
-            <h2>Historial de Temperaturas</h2>
-            <div class="chart-container">
-                <canvas id="grafico"></canvas>
-            </div>
+            <canvas id="grafico"></canvas>
         </div>
 
-        <!-- Otras pestañas se mantienen igual -->
-        <!-- ... -->
+        <!-- Pestaña Alertas -->
+        <div id="alertas" class="tabcontent">
+            <h2>Historial de Alertas</h2>
+            <div id="listaAlertas"></div>
+        </div>
+
+        <!-- Pestaña Configuración -->
+        <div id="config" class="tabcontent">
+            <h2>Configurar Umbral</h2>
+            <input type="number" id="umbralInput" placeholder="Ej: 30">
+            <button onclick="guardarUmbral()">Guardar</button>
+        </div>
     </div>
 
     <script>
         const socket = io();
         let chart;
 
-        // Función para actualizar el cuadro de temperatura
-        function actualizarTemperaturaActual(valor) {
-            const tempElement = document.getElementById('temp-actual');
-            tempElement.innerHTML = `${valor} °C`;
-            
-            // Cambiar color según umbral
-            const umbral = document.getElementById('umbral')?.value || 24;
-            tempElement.style.color = valor > umbral ? var(--alert-color) : 'white';
+        // Función para cambiar pestañas
+        function openTab(evt, tabName) {
+            // Ocultar todos los contenidos
+            document.querySelectorAll('.tabcontent').forEach(tab => {
+                tab.classList.remove('active');
+            });
+
+            // Remover clase active de los botones
+            document.querySelectorAll('.tablinks').forEach(btn => {
+                btn.classList.remove('active');
+            });
+
+            // Mostrar contenido seleccionado
+            document.getElementById(tabName).classList.add('active');
+            evt.currentTarget.classList.add('active');
         }
 
-        // Configurar gráfico
+        // Inicializar gráfico
         async function initChart() {
             try {
                 const response = await fetch('/api/data');
@@ -145,46 +104,31 @@
                         datasets: [{
                             label: 'Temperatura (°C)',
                             data: data.map(d => d.valor),
-                            borderColor: var(--secondary-color),
-                            backgroundColor: 'rgba(52, 152, 219, 0.1)',
-                            tension: 0.3,
-                            fill: true
+                            borderColor: '#3498db',
+                            tension: 0.3
                         }]
                     },
                     options: {
                         responsive: true,
-                        maintainAspectRatio: false,
-                        scales: {
-                            y: {
-                                beginAtZero: false,
-                                title: {
-                                    display: true,
-                                    text: 'Temperatura (°C)'
-                                }
-                            },
-                            x: {
-                                title: {
-                                    display: true,
-                                    text: 'Fecha y Hora'
-                                }
-                            }
-                        }
+                        maintainAspectRatio: false
                     }
                 });
                 
-                // Mostrar última temperatura
+                // Actualizar temperatura actual
                 if(data.length > 0) {
-                    actualizarTemperaturaActual(data[0].valor);
+                    document.getElementById('tempActual').textContent = 
+                        `${data[data.length - 1].valor} °C`;
                 }
             } catch (error) {
-                console.error('Error al cargar datos:', error);
+                console.error('Error:', error);
             }
         }
 
-        // Escuchar actualizaciones en tiempo real
+        // Actualizar en tiempo real
         socket.on('nueva_temperatura', (data) => {
             // Actualizar cuadro de temperatura
-            actualizarTemperaturaActual(data.valor);
+            document.getElementById('tempActual').textContent = 
+                `${data.valor} °C`;
             
             // Actualizar gráfico
             if(chart) {
@@ -194,11 +138,41 @@
             }
         });
 
-        // Resto del código anterior...
-        
+        // Configurar umbral
+        async function guardarUmbral() {
+            const umbral = document.getElementById('umbralInput').value;
+            try {
+                await fetch('/api/umbral', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ umbral })
+                });
+                alert('Umbral actualizado correctamente');
+            } catch (error) {
+                console.error('Error:', error);
+            }
+        }
+
+        // Inicialización
         document.addEventListener('DOMContentLoaded', () => {
+            // Activar pestaña por defecto
+            document.getElementById('defaultTab').click();
             initChart();
-            actualizarAlertas();
+            
+            // Cargar alertas iniciales
+            fetch('/api/alertas')
+                .then(res => res.json())
+                .then(data => {
+                    const lista = data.map(alerta => `
+                        <div style="padding: 10px; border-bottom: 1px solid #ccc;">
+                            ${new Date(alerta.timestamp).toLocaleString()} - 
+                            ${alerta.valor}°C (Umbral: ${alerta.threshold}°C)
+                        </div>
+                    `).join('');
+                    document.getElementById('listaAlertas').innerHTML = lista;
+                });
         });
     </script>
 </body>
