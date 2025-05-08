@@ -7,19 +7,14 @@ const { Server } = require("socket.io");
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server, {
-  cors: {
-    origin: "*",
-    methods: ["GET", "POST"]
-  }
-});
+const io = new Server(server, { cors: { origin: "*" } });
 
-// Middlewares
+// Configuración
 app.use(cors());
 app.use(express.json());
-app.use(express.static("public"));
+app.use(express.static("public")); // Sirve archivos estáticos
 
-// Conexión a MongoDB
+// Conexión MongoDB
 mongoose.connect("mongodb+srv://moralesjean543:J3anmarc0@cluster0.ka9udsb.mongodb.net/esp32data?retryWrites=true&w=majority&appName=Cluster0")
   .then(() => console.log("✅ Conectado a MongoDB"))
   .catch(err => console.error("❌ Error de conexión:", err));
@@ -49,7 +44,7 @@ const transporter = nodemailer.createTransport({
 });
 
 // Variables de estado
-let umbral = 24;
+let umbral = 15;
 
 // WebSockets
 io.on("connection", (socket) => {
@@ -67,22 +62,11 @@ app.post("/api/data", async (req, res) => {
     const newData = new Data({ valor });
     await newData.save();
 
-    // Emitir nueva temperatura a todos los clientes
-    io.emit("nueva_temperatura", {
-      valor: valor,
-      timestamp: new Date()
-    });
-
     if (valor > umbral) {
-      console.log(`🚨 ALERTA: Temperatura alta registrada: ${valor} °C`);
-      
       // Guardar alerta
-      const newAlert = new Alert({
-        valor: valor,
-        threshold: umbral
-      });
+      const newAlert = new Alert({ valor, threshold: umbral });
       await newAlert.save();
-
+      
       // Enviar email
       const mailOptions = {
         from: "stccontrolador@gmail.com",
@@ -90,13 +74,16 @@ app.post("/api/data", async (req, res) => {
         subject: "🚨 Alerta de Temperatura Alta",
         text: `Temperatura: ${valor}°C (Umbral: ${umbral}°C)`
       };
+      
       transporter.sendMail(mailOptions);
+      
+      // Notificación en tiempo real
+      io.emit("alerta", { valor, umbral, timestamp: new Date() });
     }
 
-    res.status(201).json({ message: "✅ Datos guardados correctamente" });
+    res.status(201).json({ message: "Datos guardados" });
   } catch (error) {
-    console.error("❌ Error al guardar:", error);
-    res.status(500).json({ error: "Error al guardar datos" });
+    res.status(500).json({ error: error.message });
   }
 });
 
@@ -105,8 +92,7 @@ app.get("/api/data", async (req, res) => {
     const datos = await Data.find().sort({ timestamp: -1 });
     res.json(datos);
   } catch (error) {
-    console.error("❌ Error al obtener datos:", error);
-    res.status(500).json({ error: "Error al obtener datos" });
+    res.status(500).json({ error: error.message });
   }
 });
 
@@ -115,8 +101,7 @@ app.get("/api/alertas", async (req, res) => {
     const alertas = await Alert.find().sort({ timestamp: -1 });
     res.json(alertas);
   } catch (error) {
-    console.error("❌ Error al obtener alertas:", error);
-    res.status(500).json({ error: "Error al obtener alertas" });
+    res.status(500).json({ error: error.message });
   }
 });
 
