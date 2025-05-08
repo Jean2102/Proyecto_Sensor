@@ -49,7 +49,7 @@ const transporter = nodemailer.createTransport({
 });
 
 // Variables de estado
-let umbral = 15;
+let umbral = 20;
 const DESTINATARIOS = [
   "moralesjean543@gmail.com",
   "jugosmorena.ec@gmail.com"
