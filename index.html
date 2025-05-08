@@ -1,121 +1,169 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Monitor de Temperatura</title>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      margin: 0; padding: 0;
-      background: #f4f4f4;
-    }
-    nav {
-      background: #333;
-      color: white;
-      padding: 10px;
-      display: flex;
-      gap: 10px;
-    }
-    nav button {
-      background: none;
-      border: none;
-      color: white;
-      cursor: pointer;
-      font-size: 16px;
-    }
-    nav button.active {
-      font-weight: bold;
-      text-decoration: underline;
-    }
-    section {
-      display: none;
-      padding: 20px;
-    }
-    section.active {
-      display: block;
-    }
-    #alerta {
-      color: red;
-      font-weight: bold;
-    }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monitor de Temperatura</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0; 
+            padding: 20px;
+            background: #f4f4f4;
+        }
+        nav {
+            background: #2c3e50;
+            color: white;
+            padding: 10px;
+            display: flex;
+            gap: 10px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        nav button {
+            background: none;
+            border: none;
+            color: white;
+            cursor: pointer;
+            font-size: 16px;
+            padding: 10px 20px;
+            transition: all 0.3s;
+        }
+        nav button:hover {
+            background: #3498db;
+        }
+        nav button.active {
+            background: #3498db;
+            border-radius: 4px;
+        }
+        section {
+            display: none;
+            padding: 20px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        section.active {
+            display: block;
+        }
+        #alerta {
+            color: #e74c3c;
+            font-weight: bold;
+        }
+        .temp-box {
+            background: #3498db;
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+            text-align: center;
+        }
+        canvas {
+            max-height: 500px;
+        }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
 
 <nav>
-  <button onclick="showTab('inicio')" class="active">Inicio</button>
-  <button onclick="showTab('lecturas')">Lecturas de Temperatura</button>
-  <button onclick="showTab('alertas')">Alertas</button>
+    <button onclick="showTab('inicio')" class="active">🏠 Inicio</button>
+    <button onclick="showTab('lecturas')">📊 Lecturas</button>
+    <button onclick="showTab('alertas')">🚨 Alertas</button>
 </nav>
 
 <section id="inicio" class="active">
-  <h2>Bienvenido</h2>
-  <p>Usa las pestañas para navegar entre lecturas y alertas.</p>
-  <button onclick="solicitarTemperatura()">📡 Obtener Temperatura Actual</button>
-  <p id="temperaturaActual"></p>
+    <div class="temp-box">
+        <h2>🌡 Temperatura Actual</h2>
+        <p id="temperaturaActual">Cargando...</p>
+    </div>
+    <canvas id="grafico"></canvas>
 </section>
 
 <section id="lecturas">
-  <h2>Lecturas de Temperatura</h2>
-  <ul id="listaLecturas"></ul>
+    <h2>📋 Historial de Lecturas</h2>
+    <ul id="listaLecturas"></ul>
 </section>
 
 <section id="alertas">
-  <h2>Alertas de Temperatura</h2>
-  <ul id="listaAlertas"></ul>
+    <h2>🔔 Historial de Alertas</h2>
+    <ul id="listaAlertas"></ul>
 </section>
 
 <script>
-let umbral = 24; // Cambia este valor según el umbral de alerta que definas
+let umbral = 15;
+let chart;
 
+// Función para mostrar pestañas
 function showTab(tabId) {
-  document.querySelectorAll('section').forEach(s => s.classList.remove('active'));
-  document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
-  document.getElementById(tabId).classList.add('active');
-  document.querySelector(nav button[onclick="showTab('${tabId}')"]).classList.add('active');
+    document.querySelectorAll('section').forEach(s => s.classList.remove('active'));
+    document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+    document.getElementById(tabId).classList.add('active');
+    document.querySelector(`nav button[onclick="showTab('${tabId}')"]`).classList.add('active');
 }
 
-function cargarLecturas() {
-  fetch("https://controlador-x8c7.onrender.com/api/data")
-    .then(res => res.json())
-    .then(data => {
-      const lista = document.getElementById("listaLecturas");
-      const alertas = document.getElementById("listaAlertas");
-      lista.innerHTML = "";
-      alertas.innerHTML = "";
-      data.forEach(d => {
-        const fecha = new Date(d.timestamp).toLocaleString();
-        const item = document.createElement("li");
-        item.textContent = 🌡 ${d.valor} °C - ${fecha};
-        lista.appendChild(item);
-        if (d.valor > umbral) {
-          const alerta = document.createElement("li");
-          alerta.innerHTML = <span id="alerta">⚠ ${d.valor} °C - ${fecha}</span>;
-          alertas.appendChild(alerta);
+// Cargar datos y gráfico
+async function cargarDatos() {
+    try {
+        const response = await fetch("https://controlador-x8c7.onrender.com/api/data");
+        const data = await response.json();
+        
+        // Actualizar temperatura actual
+        if(data.length > 0) {
+            const ultima = data[0];
+            document.getElementById("temperaturaActual").innerHTML = `
+                ${ultima.valor} °C<br>
+                <small>${new Date(ultima.timestamp).toLocaleString()}</small>
+            `;
         }
-      });
-    });
+        
+        // Actualizar lista de lecturas
+        const lista = document.getElementById("listaLecturas");
+        lista.innerHTML = data.map(d => `
+            <li>🌡 ${d.valor} °C - ${new Date(d.timestamp).toLocaleString()}</li>
+        `).join('');
+        
+        // Actualizar alertas
+        const alertas = data.filter(d => d.valor > umbral);
+        const listaAlertas = document.getElementById("listaAlertas");
+        listaAlertas.innerHTML = alertas.map(d => `
+            <li><span id="alerta">⚠ ${d.valor} °C - ${new Date(d.timestamp).toLocaleString()}</span></li>
+        `).join('');
+        
+        // Actualizar gráfico
+        if(!chart) {
+            const ctx = document.getElementById('grafico').getContext('2d');
+            chart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: data.map(d => new Date(d.timestamp).toLocaleString()),
+                    datasets: [{
+                        label: 'Temperatura (°C)',
+                        data: data.map(d => d.valor),
+                        borderColor: '#3498db',
+                        tension: 0.3
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false
+                }
+            });
+        } else {
+            chart.data.labels = data.map(d => new Date(d.timestamp).toLocaleString());
+            chart.data.datasets[0].data = data.map(d => d.valor);
+            chart.update();
+        }
+        
+    } catch (error) {
+        console.error('Error:', error);
+        alert('Error al cargar datos');
+    }
 }
 
-function solicitarTemperatura() {
-  fetch("https://controlador-x8c7.onrender.com/api/data")
-    .then(res => res.json())
-    .then(data => {
-      if (data.length > 0) {
-        const ultima = data[0];
-        const fecha = new Date(ultima.timestamp).toLocaleString();
-        document.getElementById("temperaturaActual").textContent =
-          🌡 Última temperatura: ${ultima.valor} °C (${fecha});
-      } else {
-        document.getElementById("temperaturaActual").textContent =
-          "No hay datos disponibles.";
-      }
-    });
-}
-
-setInterval(cargarLecturas, 30000); // actualiza lecturas cada 30 segundos
-cargarLecturas();
+// Actualizar cada 30 segundos
+setInterval(cargarDatos, 30000);
+cargarDatos();
 </script>
 
 </body>
