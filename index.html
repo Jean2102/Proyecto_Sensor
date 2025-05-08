@@ -1,122 +1,335 @@
 <!DOCTYPE html>
-<html lang="es">
+<html>
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Monitor de Temperatura</title>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      margin: 0; padding: 0;
-      background: #f4f4f4;
-    }
-    nav {
-      background: #333;
-      color: white;
-      padding: 10px;
-      display: flex;
-      gap: 10px;
-    }
-    nav button {
-      background: none;
-      border: none;
-      color: white;
-      cursor: pointer;
-      font-size: 16px;
-    }
-    nav button.active {
-      font-weight: bold;
-      text-decoration: underline;
-    }
-    section {
-      display: none;
-      padding: 20px;
-    }
-    section.active {
-      display: block;
-    }
-    #alerta {
-      color: red;
-      font-weight: bold;
-    }
-  </style>
+    <title>Monitor de Temperatura</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        
+        .card {
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+        
+        .data-table th, .data-table td {
+            border: 1px solid #ddd;
+            padding: 12px;
+            text-align: left;
+        }
+        
+        .data-table th {
+            background-color: #f2f2f2;
+        }
+        
+        .data-table tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        
+        .btn {
+            background-color: #ff4444;
+            color: white;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        
+        .btn:hover {
+            background-color: #cc0000;
+        }
+        
+        .refresh-info {
+            margin-top: 20px;
+            font-style: italic;
+            color: #666;
+        }
+        
+        .chart-container {
+            height: 400px;
+        }
+        
+        .alert-badge {
+            display: inline-block;
+            background-color: #ff4444;
+            color: white;
+            padding: 3px 8px;
+            border-radius: 10px;
+            font-size: 0.8em;
+            margin-left: 10px;
+        }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="/socket.io/socket.io.js"></script>
 </head>
 <body>
+    <h1>Monitor de Temperatura en Tiempo Real</h1>
+    
+    <div class="card">
+        <h2>Gráfico de Temperatura</h2>
+        <div class="chart-container">
+            <canvas id="grafico"></canvas>
+        </div>
+    </div>
+    
+    <div class="card">
+        <h2>Historial de Alertas <span id="alert-count" class="alert-badge">0</span></h2>
+        <div id="lista-alertas"></div>
+    </div>
+    
+    <div class="card">
+        <h2>Historial de Datos</h2>
+        <div style="overflow-x: auto;">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Fecha/Hora</th>
+                        <th>Temperatura (°C)</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody id="tabla-datos">
+                    <!-- Datos se cargarán aquí -->
+                </tbody>
+            </table>
+        </div>
+        <div class="refresh-info">
+            Última actualización: <span id="last-update">--</span>
+            (Actualización automática cada 5 segundos)
+        </div>
+    </div>
 
-<nav>
-  <button onclick="showTab('inicio')" class="active">Inicio</button>
-  <button onclick="showTab('lecturas')">Lecturas de Temperatura</button>
-  <button onclick="showTab('alertas')">Alertas</button>
-</nav>
+    <audio id="alerta-sonido" src="/alert.mp3" preload="auto"></audio>
 
-<section id="inicio" class="active">
-  <h2>Bienvenido</h2>
-  <p>Usa las pestañas para navegar entre lecturas y alertas.</p>
-  <button onclick="solicitarTemperatura()">📡 Obtener Temperatura Actual</button>
-  <p id="temperaturaActual"></p>
-</section>
-
-<section id="lecturas">
-  <h2>Lecturas de Temperatura</h2>
-  <ul id="listaLecturas"></ul>
-</section>
-
-<section id="alertas">
-  <h2>Alertas de Temperatura</h2>
-  <ul id="listaAlertas"></ul>
-</section>
-
-<script>
-let umbral = 24; // Cambia este valor según el umbral de alerta que definas
-
-function showTab(tabId) {
-  document.querySelectorAll('section').forEach(s => s.classList.remove('active'));
-  document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
-  document.getElementById(tabId).classList.add('active');
-  document.querySelector(`nav button[onclick="showTab('${tabId}')"]`).classList.add('active');
-}
-
-function cargarLecturas() {
-  fetch("https://controlador-x8c7.onrender.com/api/data")
-    .then(res => res.json())
-    .then(data => {
-      const lista = document.getElementById("listaLecturas");
-      const alertas = document.getElementById("listaAlertas");
-      lista.innerHTML = "";
-      alertas.innerHTML = "";
-      data.forEach(d => {
-        const fecha = new Date(d.timestamp).toLocaleString();
-        const item = document.createElement("li");
-        item.textContent = `🌡️ ${d.valor} °C - ${fecha}`;
-        lista.appendChild(item);
-        if (d.valor > umbral) {
-          const alerta = document.createElement("li");
-          alerta.innerHTML = `<span id="alerta">⚠️ ${d.valor} °C - ${fecha}</span>`;
-          alertas.appendChild(alerta);
+    <script>
+        // Configuración fija del umbral (se modifica solo en código)
+        const TEMPERATURE_THRESHOLD = 30.0; // <- Umbral definido aquí
+        
+        // Variables globales
+        let chart;
+        let allData = [];
+        let visibleData = [];
+        const socket = io();
+        const itemsPerPage = 10;
+        
+        // Inicialización al cargar la página
+        document.addEventListener('DOMContentLoaded', () => {
+            initChart();
+            loadData();
+            setInterval(loadData, 5000); // Actualizar cada 5 segundos
+            
+            // Mostrar umbral actual (solo informativo)
+            console.log(`Umbral configurado: ${TEMPERATURE_THRESHOLD}°C`);
+        });
+        
+        // Configurar gráfico
+        async function initChart() {
+            const ctx = document.getElementById('grafico').getContext('2d');
+            chart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    datasets: [{
+                        label: 'Temperatura (°C)',
+                        borderColor: '#36A2EB',
+                        backgroundColor: 'rgba(54, 162, 235, 0.1)',
+                        tension: 0.1,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: {
+                            type: 'time',
+                            time: {
+                                tooltipFormat: 'DD/MM/YY HH:mm:ss'
+                            }
+                        },
+                        y: {
+                            title: {
+                                display: true,
+                                text: 'Temperatura (°C)'
+                            }
+                        }
+                    },
+                    plugins: {
+                        annotation: {
+                            annotations: {
+                                thresholdLine: {
+                                    type: 'line',
+                                    yMin: TEMPERATURE_THRESHOLD,
+                                    yMax: TEMPERATURE_THRESHOLD,
+                                    borderColor: 'red',
+                                    borderWidth: 2,
+                                    borderDash: [6, 6],
+                                    label: {
+                                        content: `Umbral: ${TEMPERATURE_THRESHOLD}°C`,
+                                        enabled: true,
+                                        position: 'left'
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            });
         }
-      });
-    });
-}
+        
+        // Cargar datos del servidor
+        async function loadData() {
+            try {
+                const response = await fetch('/api/data');
+                const data = await response.json();
+                allData = data;
+                updateVisibleData();
+                updateChart();
+                updateLastUpdateTime();
+            } catch (error) {
+                console.error('Error cargando datos:', error);
+            }
+            
+            await actualizarAlertas();
+        }
+        
+        // Actualizar datos visibles
+        function updateVisibleData() {
+            visibleData = allData.slice(-itemsPerPage);
+            renderTable();
+        }
+        
+        // Renderizar tabla de datos
+        function renderTable() {
+            const tableBody = document.getElementById('tabla-datos');
+            tableBody.innerHTML = '';
+            
+            visibleData.forEach(item => {
+                const row = document.createElement('tr');
+                
+                // Resaltar valores sobre el umbral
+                const isAlert = item.valor > TEMPERATURE_THRESHOLD;
+                const rowStyle = isAlert ? 'background-color: #fff0f0;' : '';
+                
+                row.innerHTML = `
+                    <td>${new Date(item.timestamp).toLocaleString()}</td>
+                    <td style="${rowStyle}">${item.valor.toFixed(2)}</td>
+                    <td>
+                        <button class="btn" onclick="hideDataItem('${item._id}')">
+                            Ocultar
+                        </button>
+                    </td>
+                `;
+                
+                tableBody.appendChild(row);
+            });
+        }
+        
+        // Ocultar dato (solo en frontend)
+        function hideDataItem(id) {
+            allData = allData.filter(item => item._id !== id);
+            updateVisibleData();
+            updateChart();
+        }
+        
+        // Actualizar gráfico
+        function updateChart() {
+            const sortedData = [...allData].sort((a, b) => 
+                new Date(a.timestamp) - new Date(b.timestamp)
+            );
+            
+            chart.data.labels = sortedData.map(item => new Date(item.timestamp));
+            chart.data.datasets[0].data = sortedData.map(item => ({
+                x: new Date(item.timestamp),
+                y: item.valor
+            }));
+            
+            chart.update();
+        }
+        
+        // Actualizar alertas
+        async function actualizarAlertas() {
+            try {
+                const response = await fetch('/api/alertas');
+                const alertas = await response.json();
+                
+                const lista = alertas.map(a => `
+                    <div style="padding: 10px; border-bottom: 1px solid #eee;">
+                        ${new Date(a.timestamp).toLocaleString()} - 
+                        <b>${a.valor.toFixed(2)}°C</b> (Umbral: ${a.threshold}°C)
+                    </div>
+                `).join('');
+                
+                document.getElementById('lista-alertas').innerHTML = lista || "No hay alertas recientes";
+                document.getElementById('alert-count').textContent = alertas.length;
+            } catch (error) {
+                console.error('Error cargando alertas:', error);
+            }
+        }
+        
+        // Actualizar marca de tiempo
+        function updateLastUpdateTime() {
+            document.getElementById('last-update').textContent = 
+                new Date().toLocaleTimeString();
+        }
+        
+        // Escuchar alertas en tiempo real
+        socket.on('alerta', (data) => {
+            document.getElementById('alerta-sonido').play();
+            
+            const toast = document.createElement('div');
+            toast.style = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                background-color: #ff4444;
+                color: white;
+                padding: 15px;
+                border-radius: 5px;
+                box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+                z-index: 1000;
+                animation: fadeIn 0.5s;
+            `;
+            toast.innerHTML = `
+                <strong>¡ALERTA!</strong><br>
+                Temperatura: ${data.valor.toFixed(2)}°C<br>
+                Umbral: ${data.threshold}°C
+            `;
+            
+            document.body.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.style.animation = 'fadeOut 0.5s';
+                setTimeout(() => toast.remove(), 500);
+            }, 5000);
+            
+            actualizarAlertas();
+        });
+    </script>
 
-function solicitarTemperatura() {
-  fetch("https://controlador-x8c7.onrender.com/api/data")
-    .then(res => res.json())
-    .then(data => {
-      if (data.length > 0) {
-        const ultima = data[0];
-        const fecha = new Date(ultima.timestamp).toLocaleString();
-        document.getElementById("temperaturaActual").textContent =
-          `🌡️ Última temperatura: ${ultima.valor} °C (${fecha})`;
-      } else {
-        document.getElementById("temperaturaActual").textContent =
-          "No hay datos disponibles.";
-      }
-    });
-}
-
-setInterval(cargarLecturas, 30000); // actualiza lecturas cada 30 segundos
-cargarLecturas();
-</script>
-
+    <style>
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        @keyframes fadeOut {
+            from { opacity: 1; transform: translateY(0); }
+            to { opacity: 0; transform: translateY(20px); }
+        }
+    </style>
 </body>
 </html>
