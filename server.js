@@ -70,7 +70,7 @@ app.post("/api/data", async (req, res) => {
       // Enviar email
       const mailOptions = {
         from: "stccontrolador@gmail.com",
-        to: "moralesjean543@gmail.com",
+        to: "jugosmorena.ec@gmail.com",
         subject: "🚨 Alerta de Temperatura Alta",
         text: `Temperatura: ${valor}°C (Umbral: ${umbral}°C)`
       };
