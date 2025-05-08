@@ -3,36 +3,117 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Monitor de Temperatura</title>
+    <title>Sistema de Monitoreo de Temperatura</title>
     <style>
-        /* Estilos mejorados */
+        :root {
+            --primary-color: #2c3e50;
+            --secondary-color: #3498db;
+            --alert-color: #e74c3c;
+        }
+
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f6fa;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .tab {
+            overflow: hidden;
+            background-color: #fff;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        .tab button {
+            background-color: inherit;
+            float: left;
+            border: none;
+            outline: none;
+            cursor: pointer;
+            padding: 14px 20px;
+            transition: 0.3s;
+            font-size: 16px;
+            color: var(--primary-color);
+        }
+
+        .tab button:hover {
+            background-color: #f8f9fa;
+        }
+
+        .tab button.active {
+            border-bottom: 3px solid var(--secondary-color);
+            color: var(--secondary-color);
+        }
+
         .tabcontent {
             display: none;
-            padding: 20px;
-            animation: fadeIn 0.5s;
+            background: white;
+            padding: 25px;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
         }
-        
-        .tabcontent.active {
-            display: block;
+
+        .config-section {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 25px;
         }
-        
-        @keyframes fadeIn {
-            from { opacity: 0; }
-            to { opacity: 1; }
+
+        input[type="number"] {
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            width: 200px;
         }
-        
-        .temp-actual {
-            background: #3498db;
+
+        button {
+            padding: 10px 20px;
+            background-color: var(--secondary-color);
             color: white;
-            padding: 20px;
-            border-radius: 10px;
-            margin: 20px 0;
-            text-align: center;
-            font-size: 24px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s;
         }
-        
+
+        button:hover {
+            background-color: #2980b9;
+        }
+
         #grafico {
+            margin: 20px 0;
             max-height: 500px;
+        }
+
+        .alertas-list {
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            padding: 15px;
+        }
+
+        .alerta-item {
+            padding: 12px;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .alerta-item:last-child {
+            border-bottom: none;
+        }
+
+        .alerta-valor {
+            color: var(--alert-color);
+            font-weight: bold;
         }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -40,32 +121,36 @@
 </head>
 <body>
     <div class="container">
+        <h1>Monitor de Temperatura en Tiem Real</h1>
+        
         <div class="tab">
-            <button class="tablinks" onclick="openTab(event, 'monitor')" id="defaultTab">Monitor</button>
+            <button class="tablinks active" onclick="openTab(event, 'monitor')">Monitor</button>
             <button class="tablinks" onclick="openTab(event, 'alertas')">Alertas</button>
             <button class="tablinks" onclick="openTab(event, 'config')">Configuración</button>
         </div>
 
         <!-- Pestaña Monitor -->
-        <div id="monitor" class="tabcontent">
-            <div class="temp-actual" id="tempActual">
-                Cargando...
-            </div>
+        <div id="monitor" class="tabcontent" style="display: block;">
+            <h2>Gráfico de Temperatura</h2>
             <canvas id="grafico"></canvas>
         </div>
 
         <!-- Pestaña Alertas -->
         <div id="alertas" class="tabcontent">
             <h2>Historial de Alertas</h2>
-            <div id="listaAlertas"></div>
+            <div class="alertas-list" id="lista-alertas"></div>
         </div>
 
         <!-- Pestaña Configuración -->
         <div id="config" class="tabcontent">
-            <h2>Configurar Umbral</h2>
-            <input type="number" id="umbralInput" placeholder="Ej: 30">
-            <button onclick="guardarUmbral()">Guardar</button>
+            <h2>Configuración de Umbral</h2>
+            <div class="config-section">
+                <input type="number" id="umbral" placeholder="Ej: 24" step="0.1">
+                <button onclick="setUmbral()">Guardar Umbral</button>
+            </div>
         </div>
+
+        <audio id="alerta-sonido" src="/alert.mp3"></audio>
     </div>
 
     <script>
@@ -74,18 +159,15 @@
 
         // Función para cambiar pestañas
         function openTab(evt, tabName) {
-            // Ocultar todos los contenidos
             document.querySelectorAll('.tabcontent').forEach(tab => {
-                tab.classList.remove('active');
+                tab.style.display = 'none';
             });
-
-            // Remover clase active de los botones
+            
             document.querySelectorAll('.tablinks').forEach(btn => {
                 btn.classList.remove('active');
             });
-
-            // Mostrar contenido seleccionado
-            document.getElementById(tabName).classList.add('active');
+            
+            document.getElementById(tabName).style.display = 'block';
             evt.currentTarget.classList.add('active');
         }
 
@@ -104,75 +186,98 @@
                         datasets: [{
                             label: 'Temperatura (°C)',
                             data: data.map(d => d.valor),
-                            borderColor: '#3498db',
-                            tension: 0.3
+                            borderColor: var(--secondary-color),
+                            tension: 0.3,
+                            fill: false
                         }]
                     },
                     options: {
                         responsive: true,
-                        maintainAspectRatio: false
+                        scales: {
+                            y: {
+                                beginAtZero: false
+                            }
+                        }
                     }
                 });
-                
-                // Actualizar temperatura actual
-                if(data.length > 0) {
-                    document.getElementById('tempActual').textContent = 
-                        `${data[data.length - 1].valor} °C`;
-                }
             } catch (error) {
-                console.error('Error:', error);
+                console.error('Error al cargar datos:', error);
             }
         }
 
-        // Actualizar en tiempo real
-        socket.on('nueva_temperatura', (data) => {
-            // Actualizar cuadro de temperatura
-            document.getElementById('tempActual').textContent = 
-                `${data.valor} °C`;
-            
-            // Actualizar gráfico
-            if(chart) {
-                chart.data.labels.push(new Date(data.timestamp).toLocaleString());
-                chart.data.datasets[0].data.push(data.valor);
-                chart.update();
-            }
-        });
-
-        // Configurar umbral
-        async function guardarUmbral() {
-            const umbral = document.getElementById('umbralInput').value;
+        // Actualizar lista de alertas
+        async function actualizarAlertas() {
             try {
-                await fetch('/api/umbral', {
+                const response = await fetch('/api/alertas');
+                const alertas = await response.json();
+                
+                const lista = alertas.map(alerta => `
+                    <div class="alerta-item">
+                        <div>
+                            <span>${new Date(alerta.timestamp).toLocaleString()}</span>
+                        </div>
+                        <div>
+                            <span class="alerta-valor">${alerta.valor}°C</span>
+                            (Umbral: ${alerta.threshold}°C)
+                        </div>
+                    </div>
+                `).join('');
+                
+                document.getElementById('lista-alertas').innerHTML = lista;
+            } catch (error) {
+                console.error('Error al cargar alertas:', error);
+            }
+        }
+
+        // Configurar nuevo umbral
+        async function setUmbral() {
+            const input = document.getElementById('umbral');
+            const umbral = parseFloat(input.value);
+            
+            if (isNaN(umbral)) {
+                alert('Ingrese un valor numérico válido');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/umbral', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
                     },
                     body: JSON.stringify({ umbral })
                 });
-                alert('Umbral actualizado correctamente');
+                
+                const result = await response.json();
+                alert(result.message);
             } catch (error) {
-                console.error('Error:', error);
+                console.error('Error al actualizar umbral:', error);
+                alert('Error al actualizar el umbral');
             }
         }
 
+        // Escuchar alertas en tiempo real
+        socket.on('alerta', (data) => {
+            document.getElementById('alerta-sonido').play();
+            
+            const alertMessage = `¡ALERTA! Temperatura actual: ${data.valor}°C\n` +
+                               `Umbral configurado: ${data.umbral}°C\n` +
+                               `Hora: ${new Date(data.timestamp).toLocaleTimeString()}`;
+            
+            alert(alertMessage);
+            actualizarAlertas();
+        });
+
         // Inicialización
         document.addEventListener('DOMContentLoaded', () => {
-            // Activar pestaña por defecto
-            document.getElementById('defaultTab').click();
             initChart();
+            actualizarAlertas();
             
-            // Cargar alertas iniciales
-            fetch('/api/alertas')
-                .then(res => res.json())
-                .then(data => {
-                    const lista = data.map(alerta => `
-                        <div style="padding: 10px; border-bottom: 1px solid #ccc;">
-                            ${new Date(alerta.timestamp).toLocaleString()} - 
-                            ${alerta.valor}°C (Umbral: ${alerta.threshold}°C)
-                        </div>
-                    `).join('');
-                    document.getElementById('listaAlertas').innerHTML = lista;
-                });
+            // Actualizar datos cada 1 minuto
+            setInterval(() => {
+                chart.update();
+                actualizarAlertas();
+            }, 60000);
         });
     </script>
 </body>
