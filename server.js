@@ -74,7 +74,7 @@ const enviarAlertas = async (valor) => {
           <p><strong>Umbral configurado:</strong> ${umbral}°C</p>
           <p><strong>Fecha:</strong> ${new Date().toLocaleString()}</p>
           <hr>
-          <p>Sistema de monitoreo IoT - ${process.env.APP_NAME || "Controlador Temperatura"}</p>
+          <p>Sistema de monitoreo STC - ${process.env.APP_NAME || "Controlador Temperatura"}</p>
         `
       });
     });
